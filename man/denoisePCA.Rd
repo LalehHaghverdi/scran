@@ -12,14 +12,14 @@
     preserve.dim=FALSE, approximate=FALSE, rand.seed=1000)
 
 \S4method{denoisePCA}{SingleCellExperiment}(x, ..., subset.row=NULL, 
-    value=c("pca", "n", "lowrank"), assay.type="logcounts", get.spikes=FALSE)
+    value=c("pca", "n", "lowrank"), assay.type="logcounts", 
+    get.spikes=FALSE, sce.out=TRUE)
 }
 
 \arguments{
 \item{x}{A numeric matrix of log-expression values for \code{denoisePCA,ANY-method}, 
 or a SingleCellExperiment object containing such values for \code{denoisePCA,SingleCellExperiment-method}.}
-\item{technical}{A named numeric vector containing the technical variance for each gene in \code{x}.
-Alternatively, a function that accepts the average log-expression and returns the technical variance.}
+\item{technical}{A function that computes the technical component of the variance for a gene with a given mean (log-)expression, see \code{?\link{trendVar}}.}
 \item{design}{A numeric matrix containing the experimental design.
 If \code{NULL}, all cells are assumed to belong to a single group.}
 \item{subset.row}{A logical, integer or character vector indicating the rows of \code{x} to use.
@@ -32,8 +32,9 @@ All genes are used by default.}
 This can be set to \code{NA} to use the existing session seed.}
 \item{...}{Further arguments to pass to \code{denoisePCA,ANY-method}.}
 \item{assay.type}{A string specifying which assay values to use.}
-\item{get.spikes}{A logical specifying whether spike-in transcripts should be used.
-This is ignored if \code{subset.row} is specified.}
+\item{get.spikes}{A logical scalar specifying whether spike-in transcripts should be used.
+This will be intersected with \code{subset.row} if the latter is specified.}
+\item{sce.out}{A logical scalar specifying whether a modified SingleCellExperiment object should be returned.}
 }
 
 \value{
@@ -41,9 +42,10 @@ For \code{denoisePCA,ANY-method}, a numeric matrix is returned containing the se
 If \code{value="n"}, it will return an integer scalar specifying the number of retained components.
 If \code{value="lowrank"}, it will return a low-rank approximation of \code{x} with the same dimensions.
 
-For \code{denoisePCA,SingleCellExperiment-method}, a SingleCellExperiment object is returned containing the PCs in the \code{reducedDimension} slot if \code{value="pca"}.
+For \code{denoisePCA,SingleCellExperiment-method}, the return value is the same as \code{denoisePCA,ANY-method} if \code{sce.out=TRUE} or \code{value="n"}.
+Otherwise, a SingleCellExperiment object is returned that is a modified version of \code{x}.
+If \code{value="pca"}, the modified object will contain the PCs as the \code{"PCA"} entry in the \code{reducedDims} slot.
 If \code{value="lowrank"}, it will return a low-rank approximation in \code{assays} slot, named \code{"lowrank"}.
-Currently, \code{value="n"} will return the object without modification.
 }
 
 \details{
