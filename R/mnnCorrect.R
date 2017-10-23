@@ -145,7 +145,7 @@ mnnCorrect<- function(..., inquiry.genes=NULL, hvg.genes=NULL, k=20, sigma=1, co
 
     # Formatting output to be consistent with input.
     names(output0) <- names(batches0)
-    list(corrected=output0, mnns.list=mnns.list)
+    list(corrected=output0, mnns.list=mnns.list, batch.vects=sets$vect0)
 }
 
 find.mutual.nn <- function(exprs1, exprs2, exprs10, exprs20,clust2=NULL, k1, k2, sigma=1, withQC=FALSE)
@@ -221,8 +221,10 @@ find.mutual.nn <- function(exprs1, exprs2, exprs10, exprs20,clust2=NULL, k1, k2,
     if (sigma==0) {
         G <- matrix(1, n2, n2)
     } else if (n2< 3000) {
-        dd2 <- as.matrix(dist(data2))
-        G <- exp(-dd2^2/sigma)
+      G <- matrix(0,n2,n2)
+      dd2 <- unclass(proxy::dist(data2[A2,], data2)) 
+      G[seq_len(nrow(data2)),A2]=exp(-dd2^2/sigma)  #rowsums of G give the density 
+      
     } else {
         kk <- min(length(A2),100)
         W <- get.knnx(data2[A2,], query=data2, k=kk)
@@ -235,9 +237,9 @@ find.mutual.nn <- function(exprs1, exprs2, exprs10, exprs20,clust2=NULL, k1, k2,
         nonlist3<-t(exp(-(W$nn.dist)^2/sigma) )#lapply(seq_len(nrow(W$nn.dist)), function(i) exp(-(W$nn.dist[i,])^2/sigma)  )
         list2<-lapply(seq_len(nrow(W$nn.dist)), function(i) A2[W$nn.index[i,]] )
         nonlist1<-rep(seq_len(n2),each=kk)
-        G[cbind(nonlist1,unlist(list2))]=nonlist3
+        G[cbind(nonlist1,unlist(list2))]=nonlist3  #rowsums of G give the density 
     }
-    G <- (G+t(G)) /2
+    #G <- (G+t(G)) /2
     
     #################
     D <- rowSums(G)
