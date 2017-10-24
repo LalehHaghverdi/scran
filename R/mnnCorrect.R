@@ -1,4 +1,4 @@
-mnnCorrect<- function(..., inquiry.genes=NULL, hvg.genes=NULL, k=20, sigma=1, cos.norm=TRUE, svd.dim=0, order=NULL,k.clara=0, withQC=FALSE) 
+mnnCorrect<- function(..., inquiry.genes=NULL, hvg.genes=NULL, k=20, sigma=1, cos.norm=TRUE, svd.dim=0, order=NULL,k.clara=0, withQC=FALSE,,varCare=TRUE) 
 # Performs correction based on the batches specified in the ellipsis.
 #    
 # written by Laleh Haghverdi
@@ -188,6 +188,7 @@ find.mutual.nn <- function(exprs1, exprs2, exprs10, exprs20,clust2=NULL, k1, k2,
     vect0 <- data10[A1,] - data20[A2,] 
     
     ###matched shift variance in data1
+    if (varCare==TRUE){
     tvecte<-cosine.norm(t(vect))
     data2p<-data2 %*% tvecte #n*m (m vects) 
     var2=colVars(data2p) #variance of data on the direction of each vect
@@ -215,16 +216,18 @@ find.mutual.nn <- function(exprs1, exprs2, exprs10, exprs20,clust2=NULL, k1, k2,
     var10=colVars(data10p) #variance of data on the direction of each vect
     r.var10=runif(nrow(vect0),min=0,max=sqrt(var10)/2)
     vect0<-vect0+r.var10* t(tvect0e)
-
+    }
       
     # Gaussian smoothing of individual correction vectors for MNN pairs.
     if (sigma==0) {
         G <- matrix(1, n2, n2)
     } else if (n2< 3000) {
-      G <- matrix(0,n2,n2)
-      dd2 <- unclass(proxy::dist(data2[A2,], data2)) 
-      G[seq_len(nrow(data2)),A2]=exp(-dd2^2/sigma)  #rowsums of G give the density 
-      
+      dd2 <- as.matrix(dist(data2))  #colsums of G give the density !until else
+      G <- exp(-dd2^2/sigma)
+      # G <- matrix(0,n2,n2)
+      # dd2 <- unclass(proxy::dist(data2[A2,], data2)) 
+      # G[A2,seq_len(nrow(data2))]=exp(-dd2^2/sigma) #colsums of G give the density
+      # G<- t(G) #rowsums of G give the density
     } else {
         kk <- min(length(A2),100)
         W <- get.knnx(data2[A2,], query=data2, k=kk)
