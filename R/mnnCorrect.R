@@ -63,6 +63,7 @@ mnnCorrect<- function(..., inquiry.genes=NULL, hvg.genes=NULL, k=20, sigma=1, co
     
     output0 <- vector("list", nbatches)
     output0[[ref]] <- ref.batch0        #output first G.N batch before Gn modifications by aggregate
+    ang.with.ref<- vector("list", nbatches)
     
     if ( (ncol(ref.batch)> 3000) & (k.clara>0) ){
     #k.clara=1000#round(ncol(ref.batch)/1000)+1
@@ -93,6 +94,17 @@ mnnCorrect<- function(..., inquiry.genes=NULL, hvg.genes=NULL, k=20, sigma=1, co
         # Finding pairs of mutual nearest neighbours.
         sets <- find.mutual.nn(ref.batch, other.batch, ref.batch0, other.batch0, clust2=other.clust, k1=k, k2=k, sigma=sigma, withQC=withQC)
         #on the dimension of result: list(gn.correction.vector , GN.correction0.vector)<-find.mutual.nn(gn,gn,Gn,GN)
+        
+        #######angle of batch.vects to the reference batch svds
+        exprs.ref<-ref.batch
+        ndim=2
+        
+        exprs.ref <- exprs.ref - rowMeans(exprs.ref) 
+        S <- svd(exprs.ref, nu=2, nv=0)
+        svd.ref<-S$u
+        angle<-unlist(lapply(seq_len(nrow(sets$vect)) ,function(i)  subspaces(svd.ref,t(sets$vect[i,,drop=FALSE])) ))
+        ang.with.ref[[b]]<- angle[angle>0]
+        #########
         s1 <- sets$set1
         s2 <- sets$set2
 
@@ -145,7 +157,7 @@ mnnCorrect<- function(..., inquiry.genes=NULL, hvg.genes=NULL, k=20, sigma=1, co
 
     # Formatting output to be consistent with input.
     names(output0) <- names(batches0)
-    list(corrected=output0, mnns.list=mnns.list, batch.vects=sets$vect0)
+    list(corrected=output0, mnns.list=mnns.list, batch.vects=sets$vect0, ang.with.ref=ang.with.ref)
 }
 
 find.mutual.nn <- function(exprs1, exprs2, exprs10, exprs20,clust2=NULL, k1, k2, sigma=1, withQC=FALSE,varCare=TRUE)
@@ -274,6 +286,42 @@ get.bio.span <- function(exprs, inquiry.in.hvg, ndim)
     exprs <- exprs - rowMeans(exprs) 
     S <- svd(exprs, nu=ndim, nv=0)
     S$u   
+}
+
+##
+subspaces <- function(A, B, sin.threshold=0.85, cos.threshold=1/sqrt(2), 
+assume.orthonormal=FALSE, get.angle=TRUE) 
+# Computes the angle between subspaces, to determine if spaces are orthogonal.
+# Also identifies if there are any shared subspaces. 
+{
+  if (!assume.orthonormal) { 
+    A <- pracma::orth(A)
+    B <- pracma::orth(B)
+  }
+  
+  # Singular values close to 1 indicate shared subspace A \invertsymbol{U} B
+  # Otherwise A and B are completely orthogonal, i.e., all angles=90.
+  S <- svd(t(A) %*% B)
+  shared <- sum(S$d > sin.threshold)
+  if (!get.angle) {
+    return(list(nshared=shared))
+  }
+  
+  # Computing the angle from singular values; using cosine for large angles,
+  # sine for small angles (due to differences in relative accuracy).
+  costheta <- min(S$d) 
+  if (costheta < cos.threshold){ 
+    theta <- acos(min(1, costheta))
+  } else {
+    if (ncol(A) < ncol(B)){ 
+      sintheta <- svd(t(A) - (t(A) %*% B) %*% t(B))$d[1]
+    } else {
+      sintheta <- svd(t(B) - (t(B) %*% A) %*% t(A))$d[1]
+    }
+    theta <- asin(min(1, sintheta)) 
+  }
+  
+  list(angle=180*theta/pi, nshared=shared)
 }
 
 ####
