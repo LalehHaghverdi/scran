@@ -1,4 +1,4 @@
-mnnCorrect<- function(..., inquiry.genes=NULL, hvg.genes=NULL, k=20, sigma=1, cos.norm=TRUE, svd.dim=0, order=NULL,k.clara=0, withQC=FALSE,,varCare=TRUE) 
+mnnCorrect<- function(..., inquiry.genes=NULL, hvg.genes=NULL, k=20, sigma=1, cos.norm=TRUE, svd.dim=0, order=NULL,k.clara=0, withQC=FALSE,varCare=TRUE) 
 # Performs correction based on the batches specified in the ellipsis.
 #    
 # written by Laleh Haghverdi
@@ -148,7 +148,7 @@ mnnCorrect<- function(..., inquiry.genes=NULL, hvg.genes=NULL, k=20, sigma=1, co
     list(corrected=output0, mnns.list=mnns.list, batch.vects=sets$vect0)
 }
 
-find.mutual.nn <- function(exprs1, exprs2, exprs10, exprs20,clust2=NULL, k1, k2, sigma=1, withQC=FALSE)
+find.mutual.nn <- function(exprs1, exprs2, exprs10, exprs20,clust2=NULL, k1, k2, sigma=1, withQC=FALSE,varCare=TRUE)
 # Finds mutal neighbors between data1 and data2.
 # Computes the batch correction vector for each cell in data2.
 {
@@ -178,8 +178,8 @@ find.mutual.nn <- function(exprs1, exprs2, exprs10, exprs20,clust2=NULL, k1, k2,
     
     if (withQC) {
     kn=min(nrow(data1),nrow(data2),100)
-    norm.thr=round(kn-4*sqrt(kn)) #round( (kn+sqrt(kn))/2) #between sum of kn random (orthogonal) vectors and max
-    A<-qcMNNs(A,data1,data2,kk=kn,norm.thr= norm.thr)
+    #norm.thr=round(kn-4*sqrt(kn)) #round( (kn+sqrt(kn))/2) #between sum of kn random (orthogonal) vectors and max
+    A<-qcMNNs(A,data1,data2,kk=kn)
     }
     # Computing the batch correction vector between MNN pairs.
     A1 <- A[,1]
@@ -286,12 +286,32 @@ cosine.norm <- function(X)
 }
 
 ####
-qcMNNs<-function (mnns,data1,data2,kk=100,norm.thr=NULL) {
+qcMNNs<-function (mnns,data1,data2,kk=100) {
   #data n*g
   #kk is no. nearest neighbours to calculate sum of vectors
   #library(FNN)
   
-  if (is.null(norm.thr)) {norm.thr=round( (kk-4*sqrt(kk)) )}
+  ###set the norm.thr to 80% quantile of all cell's vects.norm in data1
+#  if (is.null(norm.thr)) {
+  data1 <- data1 - rowMeans(data1) 
+  S <- svd(data1, nu=2, nv=0)
+  data1<-S$u 
+  
+  data2 <- data2 - rowMeans(data2) 
+  S <- svd(data2, nu=2, nv=0)
+  data2<-S$u 
+  
+  W <- FNN::get.knnx(data1, query=data1, k=kk)
+  id.list<-lapply(seq_len(nrow(W$nn.index)), function(i) W$nn.index[i,])
+  center.list<-lapply(seq_len(nrow(W$nn.index)), function(i) matrix( rep(data1[i,],each=kk),nrow=kk,ncol=ncol(data1) ) )
+  
+  vects<-(lapply(seq_len(nrow(W$nn.index)), function(i) data1[W$nn.index[i,],] - center.list[[i]] )) #connecting vectors to each neighbour
+  vects.n<-lapply((vects), function(v) (colSums(t(cosine.norm(t(v))))) ) #sum of normalized vectors 
+  vects.norm<-sapply((vects.n), function(v) sqrt(sum(v^2)) ) #norm of the sum vector 
+  
+    #norm.thr=round( (kk-4*sqrt(kk)) )
+    norm.thr=quantile( vects.norm ,0.80)
+ #   }
   ##check data1
   MNNS=mnns[,1]
   dat1<-data1[MNNS,]
@@ -318,6 +338,20 @@ qcMNNs<-function (mnns,data1,data2,kk=100,norm.thr=NULL) {
       #keeps=rowSums(goodMNN)>0 # if one of the pairs is a good (not on the edge) the pair is accepted
     }
   
+  ###set the norm.thr to 80% quantile of all cell's vects.norm in data2
+  #if (is.null(norm.thr)) {
+    
+    W <- FNN::get.knnx(data2, query=data2, k=kk)
+    id.list<-lapply(seq_len(nrow(W$nn.index)), function(i) W$nn.index[i,])
+    center.list<-lapply(seq_len(nrow(W$nn.index)), function(i) matrix( rep(data2[i,],each=kk),nrow=kk,ncol=ncol(data2) ) )
+    
+    vects<-(lapply(seq_len(nrow(W$nn.index)), function(i) data2[W$nn.index[i,],] - center.list[[i]] )) #connecting vectors to each neighbour
+    vects.n<-lapply((vects), function(v) (colSums(t(cosine.norm(t(v))))) ) #sum of normalized vectors 
+    vects.norm<-sapply((vects.n), function(v) sqrt(sum(v^2)) ) #norm of the sum vector 
+    
+    #norm.thr=round( (kk-4*sqrt(kk)) )
+    norm.thr=quantile( vects.norm ,0.80)
+ # }
   ##check data2
   MNNS=mnns[,2]
   dat2<-data2[MNNS,]
@@ -331,6 +365,9 @@ qcMNNs<-function (mnns,data1,data2,kk=100,norm.thr=NULL) {
   vects.norm<-sapply((vects.n), function(v) sqrt(sum(v^2)) )
   
   goodMNN[,2]<-(vects.norm<norm.thr)
+  
+  hist(vects.norm,100, main=paste0("norm (upper)threshold for sum of 100 vectors= ",norm.thr) )
+  
   ratio=sum(goodMNN[,2])/nrow(goodMNN)
   if (ratio==0) {
     warning("All mnns in the second batch failed the QC edge test. results are shown without QC.Try running the function with a lower norm.thr for withQC.")
