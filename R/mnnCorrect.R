@@ -102,8 +102,7 @@ mnnCorrect<- function(..., inquiry.genes=NULL, hvg.genes=NULL, k=20, sigma=1, co
         exprs.ref <- exprs.ref - rowMeans(exprs.ref) 
         S <- svd(exprs.ref, nu=2, nv=0)
         svd.ref<-S$u
-        angle<-unlist(lapply(seq_len(nrow(sets$vect)) ,function(i)  subspaces(svd.ref,t(sets$vect[i,,drop=FALSE])) ))
-        ang.with.ref[[b]]<- angle[angle>0]
+        ang.with.ref[[b]]<-unlist(lapply(seq_len(nrow(sets$vect)) ,function(i)  subspaces(svd.ref,t(sets$vect[i,,drop=FALSE]))$angle ))
         #########
         s1 <- sets$set1
         s2 <- sets$set2
