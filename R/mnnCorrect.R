@@ -199,6 +199,7 @@ find.mutual.nn <- function(exprs1, exprs2, exprs10, exprs20,clust2=NULL, k1, k2,
     vect0 <- data10[A1,] - data20[A2,] 
     
     ###matched shift variance in data1
+    set.seed(0)
     if (varCare==TRUE){
     tvecte<-cosine.norm(t(vect))
     data2p<-data2 %*% tvecte #n*m (m vects) 
