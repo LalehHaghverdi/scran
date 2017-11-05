@@ -1,4 +1,4 @@
-mnnCorrect<- function(..., inquiry.genes=NULL, hvg.genes=NULL, k=20, sigma=1, cos.norm=TRUE, svd.dim=0, order=NULL,k.clara=0, withQC=FALSE,varCare=TRUE) 
+mnnCorrect<- function(..., inquiry.genes=NULL, hvg.genes=NULL, k=20, sigma=1, cos.norm="inside_and_output", svd.dim=0, order=NULL,k.clara=0, withQC=FALSE,varCare=TRUE) 
 # Performs correction based on the batches specified in the ellipsis.
 #    
 # written by Laleh Haghverdi
@@ -43,8 +43,13 @@ mnnCorrect<- function(..., inquiry.genes=NULL, hvg.genes=NULL, k=20, sigma=1, co
     hvg.genes <- scran:::.subset_to_index(hvg.genes, first, byrow=TRUE)
     inquiry.in.hvg <- inquiry.genes %in% hvg.genes 
 
-    # Applying cosine normalization for MNN identification. 
-    if (cos.norm) { batches <- lapply(batches, cosine.norm) }
+    # Applying cosine normalization for MNN identification. ##added recently
+    if (cos.norm=="inside_and_output") { batches <- lapply(batches, cosine.norm)
+                    batches0 <- lapply(batches0, cosine.norm) 
+    }else if (cos.norm=="inside"){ batches <- lapply(batches, cosine.norm)
+    }  
+    else if (cos.norm=="none"){}
+    else{stop("cos.norm has three states: 'inside_and_output'/'inside'/'none'.")}
 
     # Setting up the order.
     if (is.null(order)) {
